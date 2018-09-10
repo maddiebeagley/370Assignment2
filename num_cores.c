@@ -3,7 +3,8 @@
 
 
 int main() {
-  printf("This machine has %d core(s).\n", get_nprocs_conf());
-  return 0;
+	int num_cores = get_nprocs_conf();
+	printf("This machine has %d core(s).\n", num_cores);
+	return num_cores;
 }
 

@@ -15,11 +15,14 @@ task_t *task_create(void (*work)(void *), void *params, char *name)
     new_task->work = work;
     //params for the method to invoke on
     new_task->params = params;
-    
+
     return new_task;
 }
-    
-void task_destroy(task_t *);
+
+// frees memory associated to the task
+void task_destroy(task_t *task){
+    free(task)
+}
 
 dispatch_queue_t *dispatch_queue_create(queue_type_t);
     

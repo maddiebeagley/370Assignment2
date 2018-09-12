@@ -1,6 +1,10 @@
 #include "dispatchQueue.h"
 #include "num_cores.c"
 #include <string.h>
+#include <stdlib.h>
+
+#include <pthread.h>
+#include <semaphore.h>
 
 /**
  * Takes in nothing. a thread polls through this method continually, either executing a task or waiting 
@@ -15,7 +19,7 @@ void *thread_wrapper_func(void *dispatch_queue)
 
     while (1) 
     {
-        sem_getValue(&semaphore, &sem_value);
+        sem_getvalue(&semaphore, &sem_value);
 
         //if semaphore says you are good to go, execute task at head of queue!
         if (sem_value > 0)
@@ -118,7 +122,7 @@ dispatch_queue_t *dispatch_queue_create(queue_type_t queue_type){
         thread_pointer->queue = dispatch_queue;
         thread_pointer->task = thread_wrapper_func(&semaphore);
         
-        pthread_t pthread;
+        pthread_t *pthread;
 
         //generates a new thread which calls the wrapper function!
         if(pthread_create(pthread, NULL, thread_wrapper_func, &semaphore)) {
@@ -138,24 +142,6 @@ void dispatch_queue_destroy(dispatch_queue_t *dispatch_queue){
     free(dispatch_queue);
 }
 
-//do before sync! adds a task to the queue
-int dispatch_async(dispatch_queue_t *dispatch_queue, task_t *task){
-    //need a semaphor to store when there are tasks arriving
-    sem_t semaphore = dispatch_queue->queue_semaphore;
-    //increment semaphore count when a new task is added to the queue
-    sem_wait(&semaphore);
-
-    add_to_queue(&dispatch_queue, &task);
-
-    return 0;
-}
-    
-int dispatch_sync(dispatch_queue_t *, task_t *);
-    
-void dispatch_for(dispatch_queue_t *, long, void (*)(long));
-    
-int dispatch_queue_wait(dispatch_queue_t *);
-
 //adds given task to the tail of the dispatch queue
 void add_to_queue(dispatch_queue_t *dispatch_queue, task_t *task){
 
@@ -167,5 +153,23 @@ void add_to_queue(dispatch_queue_t *dispatch_queue, task_t *task){
 
     current->next_task = task;
 }
+
+//do before sync! adds a task to the queue
+int dispatch_async(dispatch_queue_t *dispatch_queue, task_t *task){
+    //need a semaphor to store when there are tasks arriving
+    sem_t semaphore = dispatch_queue->queue_semaphore;
+    //increment semaphore count when a new task is added to the queue
+    sem_wait(&semaphore);
+
+    add_to_queue(dispatch_queue, task);
+
+    return 0;
+}
+    
+int dispatch_sync(dispatch_queue_t *, task_t *);
+    
+void dispatch_for(dispatch_queue_t *, long, void (*)(long));
+    
+int dispatch_queue_wait(dispatch_queue_t *);
 
 

@@ -14,30 +14,25 @@ void *thread_wrapper_func(void *dispatch_queue)
 { 
     dispatch_queue_t *queue_pointer = dispatch_queue;
 
-    int sem_value;
     sem_t semaphore = queue_pointer->queue_semaphore;
 
     while (1) 
     {
-        sem_getvalue(&semaphore, &sem_value);
-
         //if semaphore says you are good to go, execute task at head of queue!
-        if (sem_value > 0)
+        if (sem_wait(&semaphore))
         {
             //wait 
             //sem_wait(&semaphore); 
             printf("\nStarting execution of task..\n"); 
 
-            //decrement semaphore count now that a task has started executing
-            sem_post(&semaphore);
-
-            //execute task!!
+            //find the task to execute
             task_t *task_pointer = queue_pointer->head;
             task_t task = *task_pointer;
 
             void *params = task_pointer->params;
             void (*work)(void *) = task_pointer->work;
 
+            //execute the task
             work(params);
       
             //signal 
@@ -158,10 +153,11 @@ void add_to_queue(dispatch_queue_t *dispatch_queue, task_t *task){
 int dispatch_async(dispatch_queue_t *dispatch_queue, task_t *task){
     //need a semaphor to store when there are tasks arriving
     sem_t semaphore = dispatch_queue->queue_semaphore;
-    //increment semaphore count when a new task is added to the queue
-    sem_wait(&semaphore);
 
     add_to_queue(dispatch_queue, task);
+
+    //increment semaphore count when a new task is added to the queue
+    sem_post(&semaphore);
 
     return 0;
 }

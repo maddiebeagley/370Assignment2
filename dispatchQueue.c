@@ -2,6 +2,39 @@
 #include "num_cores.c"
 #include <string.h>
 
+/**
+ * Takes in nothing. a thread polls through this method continually, either executing a task or waiting 
+ * for one to execute! 
+ */
+void *thread_wrapper_func(void *param) 
+{ 
+    int sem_value;
+    sem_t semaphore = (sem_t)&param;
+
+    while (1) 
+    {
+        sem_getValue(&semaphore, &sem_value)
+
+        //if semaphore says you are good to go! (what should value be?)
+        if (sem_value > 0)
+        {
+            //wait 
+            sem_wait(&semaphore); 
+            printf("\nStarting execution of task..\n"); 
+
+            //execute task!!
+            sleep(4); 
+      
+            //signal 
+            printf("\nTask has been executed!\n"); 
+            sem_post(&semaphore;
+
+        }        
+    }
+    //function must return something
+    return null;
+}
+
 task_t *task_create(void (*work)(void *), void *params, char *name)
 {
     //knows it is a pointer but not what it is pointing to yet.
@@ -44,12 +77,48 @@ dispatch_queue_t *dispatch_queue_create(queue_type_t queue_type){
 
     dispatch_queue->thread_queue = (dispatch_queue_thread_t*)malloc(sizeof(dispatch_queue_thread_t) * num_threads);
 
+    //create all the threads that will be on the queue
+    //use a wrapper function to make sure threads are polling for a new task?
+    //use a semaphor so that threads are signalled when there is a new task on the queue
 
+    //while task is running, sem_wait, when done, sem_post
+    //give task a semaphore! when task starts executing call sem_wait.
+    //when task is done executing, it can call sem_post to advertise that it is done.
+    //could you have a helper method that does the sem_wait, then sem_post and calls task in between?
+    //this helper method is what the thread is constantly polling through....
 
+    //what is the signal to break a thread out of a while(1), needs to receive a task!
+
+    //a dispatch queue struct must have a semaphore... starting off with the number of threads it can have?
+
+    sem_t *semaphore;
+    sem_init(&semaphore, 0, num_threads);
+
+    dispatch_queue->queue_semaphore = semaphore;
+
+    //now initialise all the threads to call the polling function!!
+    for (int i = 0; i < num_threads; i++) 
+    {
+        dispatch_queue_thread_t thread = dispatch_queue->thread_queue[i];
+
+        thread->queue = dispatch_queue;
+        thread->task = thread_wrapper_func(semaphore);
+        
+        pthread_t pthread;
+
+        //generates a new thread which calls the wrapper function!
+        if(pthread_create(pthread, NULL, thread_wrapper_func, &semaphore))) {
+            fprintf(stderr, "\nError creating thread\n");
+            return NULL;
+        }       
+        
+        thread->pthread = pthread;
+    }
 
 }
     
 void dispatch_queue_destroy(dispatch_queue_t *dispatch_queue){
+    //TODO complete this method when you understand it a little better :) 
     free(dispatch_queue->thread_queue);
     free(dispatch_queue);
 }

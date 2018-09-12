@@ -9,11 +9,11 @@
 void *thread_wrapper_func(void *param) 
 { 
     int sem_value;
-    sem_t semaphore = (sem_t)&param;
+    sem_t semaphore = &param;
 
     while (1) 
     {
-        sem_getValue(&semaphore, &sem_value)
+        sem_getValue(&semaphore, &sem_value);
 
         //if semaphore says you are good to go! (what should value be?)
         if (sem_value > 0)
@@ -27,12 +27,12 @@ void *thread_wrapper_func(void *param)
       
             //signal 
             printf("\nTask has been executed!\n"); 
-            sem_post(&semaphore;
+            sem_post(&semaphore);
 
         }        
     }
     //function must return something
-    return null;
+    return NULL;
 }
 
 task_t *task_create(void (*work)(void *), void *params, char *name)
@@ -91,28 +91,32 @@ dispatch_queue_t *dispatch_queue_create(queue_type_t queue_type){
 
     //a dispatch queue struct must have a semaphore... starting off with the number of threads it can have?
 
-    sem_t *semaphore;
+    sem_t semaphore;
     sem_init(&semaphore, 0, num_threads);
 
     dispatch_queue->queue_semaphore = semaphore;
 
+    dispatch_queue_thread_t *thread_queue = dispatch_queue->thread_queue;
+
     //now initialise all the threads to call the polling function!!
     for (int i = 0; i < num_threads; i++) 
     {
-        dispatch_queue_thread_t thread = dispatch_queue->thread_queue[i];
+        dispatch_queue_thread_t thread = thread_queue[i];
 
-        thread->queue = dispatch_queue;
-        thread->task = thread_wrapper_func(semaphore);
+        dispatch_queue_thread_t *thread_pointer = &thread;
+
+        thread_pointer->queue = dispatch_queue;
+        thread_pointer->task = thread_wrapper_func(&semaphore);
         
         pthread_t pthread;
 
         //generates a new thread which calls the wrapper function!
-        if(pthread_create(pthread, NULL, thread_wrapper_func, &semaphore))) {
+        if(pthread_create(pthread, NULL, thread_wrapper_func, &semaphore)) {
             fprintf(stderr, "\nError creating thread\n");
             return NULL;
         }       
         
-        thread->pthread = pthread;
+        thread_pointer->pthread = pthread;
     }
 
 }

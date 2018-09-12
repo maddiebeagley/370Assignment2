@@ -10,17 +10,14 @@
  * Takes in nothing. a thread polls through this method continually, either executing a task or waiting 
  * for one to execute! 
  */
-void *thread_wrapper_func(void *dispatch_queue) 
-{ 
+void *thread_wrapper_func(void *dispatch_queue) { 
     dispatch_queue_t *queue_pointer = dispatch_queue;
-
-    sem_t semaphore = queue_pointer->queue_semaphore;
 
     while (1) 
     {
         //if semaphore says you are good to go, execute task at head of queue!
-        if (sem_wait(&semaphore))
-        {
+        sem_wait(&queue_pointer->queue_semaphore);
+        
             //wait 
             //sem_wait(&semaphore); 
             printf("\nStarting execution of task..\n"); 
@@ -37,7 +34,7 @@ void *thread_wrapper_func(void *dispatch_queue)
       
             //signal 
             printf("\nTask has been executed!\n"); 
-        }        
+              
     }
     //function must return something
     return NULL;
@@ -74,6 +71,8 @@ dispatch_queue_t *dispatch_queue_create(queue_type_t queue_type){
     //allocates memory for the first task in the queue. currently no actual task.
     dispatch_queue->head = (task_t*)malloc(sizeof(task_t));
 
+    dispatch_queue->queue_type = queue_type;
+
     //number of threads is 1 if queue is serial
     int num_threads = 1;
 
@@ -105,12 +104,10 @@ dispatch_queue_t *dispatch_queue_create(queue_type_t queue_type){
 
     dispatch_queue->queue_semaphore = semaphore;
 
-    dispatch_queue_thread_t *thread_queue = dispatch_queue->thread_queue;
-
     //now initialise all the threads to call the polling function!!
     for (int i = 0; i < num_threads; i++) 
     {
-        dispatch_queue_thread_t thread = thread_queue[i];
+        dispatch_queue_thread_t thread = dispatch_queue->thread_queue[i];
 
         dispatch_queue_thread_t *thread_pointer = &thread;
 
@@ -126,7 +123,7 @@ dispatch_queue_t *dispatch_queue_create(queue_type_t queue_type){
             return NULL;
         }       
         
-        thread_pointer->pthread = pthread;
+        thread_pointer->pthread = (pthread_t)pthread;
     }
 
 }
@@ -142,7 +139,7 @@ void add_to_queue(dispatch_queue_t *dispatch_queue, task_t *task){
 
     task_t *current = dispatch_queue->head;
 
-    while(current->next_task != NULL){
+    while(current->next_task){
         current = current->next_task;
     }
 
@@ -152,12 +149,12 @@ void add_to_queue(dispatch_queue_t *dispatch_queue, task_t *task){
 //do before sync! adds a task to the queue
 int dispatch_async(dispatch_queue_t *dispatch_queue, task_t *task){
     //need a semaphor to store when there are tasks arriving
-    sem_t semaphore = dispatch_queue->queue_semaphore;
+    //sem_t semaphore = dispatch_queue->queue_semaphore;
 
     add_to_queue(dispatch_queue, task);
 
     //increment semaphore count when a new task is added to the queue
-    sem_post(&semaphore);
+    sem_post(&dispatch_queue->queue_semaphore);
 
     return 0;
 }

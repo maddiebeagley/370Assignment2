@@ -17,10 +17,11 @@ void *thread_wrapper_func(void *dispatch_queue) {
     while (1) 
     {
         printf("\ni have entered the while loop. waiting for semaphore to poll.\n");
-        
+
         //if semaphore says you are good to go, execute task at head of queue!
         sem_wait(&queue_pointer->queue_semaphore);
         printf("\nsem_wait has been executed!");
+        
         //find the task to execute
         task_t *task_pointer = queue_pointer->head;
         task_t task = *task_pointer;
@@ -35,7 +36,7 @@ void *thread_wrapper_func(void *dispatch_queue) {
       
         //signal 
         printf("\nTask has been executed!\n"); 
-              
+
     }
     //function must return something
     return NULL;
@@ -76,8 +77,6 @@ dispatch_queue_t *dispatch_queue_create(queue_type_t queue_type){
 
     dispatch_queue->queue_type = queue_type;
 
-
-
     //semaphore to track how many tasks there are to complete
     printf("\nmaking semaphore\n");
     sem_init(&dispatch_queue->queue_semaphore, 0, 0);
@@ -98,21 +97,20 @@ dispatch_queue_t *dispatch_queue_create(queue_type_t queue_type){
     //now initialise all the threads to call the polling function!!
     for (int i = 0; i < num_threads; i++) 
     {
-        printf("\ngenerating a new thread\n");
         dispatch_queue_thread_t thread = dispatch_queue->thread_queue[i];
 
         dispatch_queue_thread_t *thread_pointer = &thread;
 
         thread_pointer->queue = dispatch_queue;
-    
-        thread_pointer->task = thread_wrapper_func(&dispatch_queue);
 
+        printf("\ngenerating a new thread\n");
         //generates a new thread which calls the wrapper function!
         if(pthread_create(&thread_pointer->pthread, NULL, thread_wrapper_func, &dispatch_queue)) {
             //something went wrong when generating the pthread
             fprintf(stderr, "\nError creating thread\n");
             return NULL;
-        }       
+        }   
+        printf("\nmade thread\n");    
     }
     printf("\ni finish making the queue\n");
 }

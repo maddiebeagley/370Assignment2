@@ -12,22 +12,21 @@
  */
 void *thread_wrapper_func(void *dispatch_queue) { 
     dispatch_queue_t *queue_pointer = dispatch_queue;
+    printf("\nstarting the thread wrapper function...\n");
 
     while (1) 
     {
         //if semaphore says you are good to go, execute task at head of queue!
-        sem_wait(&queue_pointer->queue_semaphore);
-        
-            //wait 
-            //sem_wait(&semaphore); 
-            printf("\nStarting execution of task..\n"); 
-
+        sem_wait(queue_pointer->queue_semaphore);
+        printf("\nsem_wait has been executed!");
             //find the task to execute
             task_t *task_pointer = queue_pointer->head;
             task_t task = *task_pointer;
 
             void *params = task_pointer->params;
-            void (*work)(void *) = task_pointer->work;
+            void (*work)(void *) = task_pointer->work;  
+
+            printf("\nStarting execution of task with name: %s\n", task_pointer->name); 
 
             //execute the task
             work(params);
@@ -40,8 +39,8 @@ void *thread_wrapper_func(void *dispatch_queue) {
     return NULL;
 }
 
-task_t *task_create(void (*work)(void *), void *params, char *name)
-{
+task_t *task_create(void (*work)(void *), void *params, char *name){
+    printf("\ncreating a new task\n");
     //knows it is a pointer but not what it is pointing to yet.
     task_t *new_task;
     //only have to allocate memory for pointers of structures. 
@@ -54,6 +53,7 @@ task_t *task_create(void (*work)(void *), void *params, char *name)
     //params for the method to invoke on
     new_task->params = params;
 
+printf("\nnewtask about to be returned\n");
     return new_task;
 }
 
@@ -63,6 +63,7 @@ void task_destroy(task_t *task){
 }
 
 dispatch_queue_t *dispatch_queue_create(queue_type_t queue_type){
+    printf("\nmaking dispatch queue\n");
 
     dispatch_queue_t *dispatch_queue;
     //allocates memory for the queue to be stored
@@ -73,6 +74,13 @@ dispatch_queue_t *dispatch_queue_create(queue_type_t queue_type){
 
     dispatch_queue->queue_type = queue_type;
 
+    dispatch_queue->queue_semaphore = (sem_t*)malloc(sizeof(sem_t));
+
+    //semaphore to track how many tasks there are to complete
+    printf("\nmaking semaphore\n");
+    sem_init(dispatch_queue->queue_semaphore, 0, 0);
+    printf("\nhave made semaphore\n");
+
     //number of threads is 1 if queue is serial
     int num_threads = 1;
 
@@ -82,50 +90,28 @@ dispatch_queue_t *dispatch_queue_create(queue_type_t queue_type){
         num_threads = get_num_cores();
     }
 
+    printf("\nmaking thread queue in dispatch queue\n");
     dispatch_queue->thread_queue = (dispatch_queue_thread_t*)malloc(sizeof(dispatch_queue_thread_t) * num_threads);
-
-    //create all the threads that will be on the queue
-    //use a wrapper function to make sure threads are polling for a new task?
-    //use a semaphor so that threads are signalled when there is a new task on the queue
-
-    //while task is running, sem_wait, when done, sem_post
-    //give task a semaphore! when task starts executing call sem_wait.
-    //when task is done executing, it can call sem_post to advertise that it is done.
-    //could you have a helper method that does the sem_wait, then sem_post and calls task in between?
-    //this helper method is what the thread is constantly polling through....
-
-    //what is the signal to break a thread out of a while(1), needs to receive a task!
-
-    //a dispatch queue struct must have a semaphore... starting off with the number of threads it can have?
-
-    //semaphore to track how many tasks there are to complete
-    sem_t semaphore;
-    sem_init(&semaphore, 0, 0);
-
-    dispatch_queue->queue_semaphore = semaphore;
 
     //now initialise all the threads to call the polling function!!
     for (int i = 0; i < num_threads; i++) 
     {
+        printf("\ngenerating a new thread\n");
         dispatch_queue_thread_t thread = dispatch_queue->thread_queue[i];
 
         dispatch_queue_thread_t *thread_pointer = &thread;
 
         thread_pointer->queue = dispatch_queue;
-        thread_pointer->task = thread_wrapper_func(&semaphore);
-        
-        pthread_t *pthread;
+    
+        thread_pointer->task = thread_wrapper_func(&dispatch_queue->queue_semaphore);
 
         //generates a new thread which calls the wrapper function!
-        if(pthread_create(pthread, NULL, thread_wrapper_func, &semaphore)) {
+        if(pthread_create(&thread_pointer->pthread, NULL, thread_wrapper_func, &dispatch_queue)) {
             //something went wrong when generating the pthread
             fprintf(stderr, "\nError creating thread\n");
             return NULL;
         }       
-        
-        thread_pointer->pthread = (pthread_t)pthread;
     }
-
 }
     
 void dispatch_queue_destroy(dispatch_queue_t *dispatch_queue){
@@ -136,7 +122,7 @@ void dispatch_queue_destroy(dispatch_queue_t *dispatch_queue){
 
 //adds given task to the tail of the dispatch queue
 void add_to_queue(dispatch_queue_t *dispatch_queue, task_t *task){
-
+    printf("\nadding an element to the queue\n");
     task_t *current = dispatch_queue->head;
 
     while(current->next_task){
@@ -154,7 +140,7 @@ int dispatch_async(dispatch_queue_t *dispatch_queue, task_t *task){
     add_to_queue(dispatch_queue, task);
 
     //increment semaphore count when a new task is added to the queue
-    sem_post(&dispatch_queue->queue_semaphore);
+    sem_post(dispatch_queue->queue_semaphore);
 
     return 0;
 }

@@ -43,7 +43,7 @@
         queue_type_t queue_type;            // the type of queue - serial or concurrent
         task_t *head;                       // pointer to the first task to be executed
         dispatch_queue_thread_t *thread_queue;   //pointer to list of threads for queue to use
-        sem_t *queue_semaphore;              //hard to explain what something does when you don't know
+        sem_t queue_semaphore;              //hard to explain what something does when you don't know
 
     };
     

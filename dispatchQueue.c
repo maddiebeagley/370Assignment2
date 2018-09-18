@@ -5,7 +5,7 @@
 
 void task_destroy(task_t *task);
 
-
+volatile int threads_executing;
 
 /**
  * Takes in nothing. a thread polls through this method continually, either executing a task or waiting 
@@ -18,6 +18,7 @@ void *thread_wrapper_func(void *dispatch_queue) {
     {      
         //waits until there is a task for the thread to execute
         sem_wait(queue_pointer->queue_semaphore);
+        threads_executing++;
 
         //waits until the head of the queue is free to be retrieved
         sem_wait(queue_pointer->queue_head_semaphore);
@@ -36,6 +37,8 @@ void *thread_wrapper_func(void *dispatch_queue) {
 
         //execute the task
         work(params);
+        //thread is no longer executing after completion of task function
+        threads_executing--;
     }
     //function must return something
     return NULL;
@@ -91,6 +94,9 @@ dispatch_queue_t *dispatch_queue_create(queue_type_t queue_type){
     {
         num_threads = get_num_cores();
     }
+
+    //number of threads currently executing tasks is initially 0
+    threads_executing = 0;
 
     //allocate memory for the thread pool
     dispatch_queue->thread_queue = (dispatch_queue_thread_t*)malloc(sizeof(dispatch_queue_thread_t) * num_threads);
@@ -157,7 +163,11 @@ void dispatch_for(dispatch_queue_t *queue, long param, void (*work)(long)) {
 }
     
 int dispatch_queue_wait(dispatch_queue_t *queue) {
-    return 0;
+    while(1){
+        if (threads_executing == 0 && !queue->head){
+            return 0;
+        }
+    }
 }
 
 

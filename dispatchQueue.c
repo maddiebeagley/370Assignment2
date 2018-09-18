@@ -4,7 +4,7 @@
 #include <stdlib.h>
 
 void task_destroy(task_t *task);
-
+int num_threads;
 volatile int threads_executing;
 
 /**
@@ -95,7 +95,7 @@ dispatch_queue_t *dispatch_queue_create(queue_type_t queue_type){
     dispatch_queue -> queue_head_semaphore = head_semaphore;
 
     //number of threads is 1 if queue is serial
-    int num_threads = 1;
+    num_threads = 1;
 
     //number of threads in pool is same as number of cores if concurrent queue
     if (queue_type == CONCURRENT)
@@ -127,32 +127,19 @@ dispatch_queue_t *dispatch_queue_create(queue_type_t queue_type){
 
 //removes all memory allocated to the dispatch queue
 void dispatch_queue_destroy(dispatch_queue_t *dispatch_queue){
-    //deallocates memory for all tasks on the queue
-    /*
-    task_t *curr_task = dispatch_queue->head;
-    printf("\nname of head is %s\n", curr_task->name);
-    while(curr_task->next_task){
-        task_t *next_task = curr_task->next_task;
-        task_destroy(curr_task);
-        curr_task = next_task;
-    }
-    */
 
-   // if there are elements in the queue, free their memory
-   if (dispatch_queue->head){     
+    // if there are elements in the queue, free their memory
+    if (dispatch_queue->head){     
         task_t *curr_task = dispatch_queue->head;
         while (curr_task->next_task) {
             task_t* next_task = curr_task->next_task;
-            printf("deallocating memory for task: %s\n", curr_task->name);
             task_destroy(curr_task);
             curr_task = next_task;
         }
-        printf("deallocating memory for task: %s\n", curr_task->name);
         task_destroy(curr_task);
-   }
+    }
 
-
-    //free the memory of the threads 
+    //free the memory of the list of threads
     free(dispatch_queue->threads);
 
     //free the memory of the queue semaphores

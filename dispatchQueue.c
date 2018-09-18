@@ -181,9 +181,9 @@ int dispatch_sync(dispatch_queue_t *queue, task_t *task) {
     
 void dispatch_for(dispatch_queue_t *queue, long number, void (*work)(long)) {
 
-    for (int i = 0; i < number; i++) {
+    for(long i = 0; i < number; i++) {
         long num = i;
-        task_t* task = task_create((void(*)(void*))work, &num, "task");
+        task_t* task = task_create((void(*)(void*))work, (void*)num, "task");
         dispatch_async(queue, task);
     }
 

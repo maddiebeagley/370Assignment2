@@ -24,19 +24,27 @@ void *thread_wrapper_func(void *dispatch_queue) {
         sem_wait(queue_pointer->queue_head_semaphore);
             
         //find the task to execute
-        void *params = queue_pointer->head->params;
-        void (*work)(void *) = queue_pointer->head->work;
+        task_t* current_task = queue_pointer->head;
 
         //set the head of the queue to be the next task in the queue and remove previous head
-        task_t *next_task = queue_pointer->head->next_task;
+        task_t *next_task = current_task->next_task;
         task_destroy(queue_pointer->head);
         queue_pointer->head = queue_pointer->head->next_task;
 
         //head of the queue is now free for elements to be removed from.
-        sem_post(queue_pointer->queue_head_semaphore);        
+        sem_post(queue_pointer->queue_head_semaphore); 
+
+        void *params = current_task->params;
+        void (*work)(void *) = current_task->work;       
 
         //execute the task
         work(params);
+
+        //advertise that the current task has stopped executing
+        if (current_task->task_semaphore) {
+            sem_post(current_task->task_semaphore);
+        }
+
         //thread is no longer executing after completion of task function
         threads_executing--;
     }
@@ -156,7 +164,19 @@ int dispatch_async(dispatch_queue_t *dispatch_queue, task_t *task){
 }
     
 int dispatch_sync(dispatch_queue_t *queue, task_t *task) {
-   return 0; 
+    sem_t *semaphore = malloc(sizeof(*semaphore));
+    if (sem_init(semaphore, 0, 0) !=0 ) {
+        fprintf(stderr, "\nerror creating semaphore\n");
+    }
+    task->task_semaphore = semaphore;
+
+    add_to_queue(queue, task);
+
+    sem_post(queue->queue_semaphore);
+
+    sem_wait(task->task_semaphore);
+    
+    return 0; 
 }
     
 void dispatch_for(dispatch_queue_t *queue, long param, void (*work)(long)) {
@@ -169,5 +189,3 @@ int dispatch_queue_wait(dispatch_queue_t *queue) {
         }
     }
 }
-
-

@@ -26,22 +26,30 @@ void *thread_wrapper_func(void *dispatch_queue) {
         //if semaphore says you are good to go, execute task at head of queue!
         printf("\ncalling sem wait\n");
         
+        //waits until there is a task for the thread to execute
         sem_wait(queue_pointer->queue_semaphore);
-        printf("\nsem_wait has been executed!\n");
-        
-        
-        //find the task to execute
-        //void *params = queue_pointer->head->params;
-        //void (*work)(void *) = queue_pointer->head->work;  
+        printf("\nsem_wait has been executed, task ready to get!\n");
 
-        printf("Starting execution of task with name: %s\n", queue_pointer->head->name); 
+        //waits until the head of the queue is free to be retrieved
+        sem_wait(queue_pointer->queue_head_semaphore);
+        printf("\nsem_wait has been executed, head of the queue ready to get!\n");
+            
+        //find the task to execute
+        void *params = queue_pointer->head->params;
+        void (*work)(void *) = queue_pointer->head->work;
+
+        printf("Starting execution of task with name: %s\n", queue_pointer->head->name);   
+
+        //set the head of the queue to be the next task in the queue and remove previous head
+        task_t *next_task = queue_pointer->head->next_task;
+        task_destroy(queue_pointer->head);
+        queue_pointer->head = queue_pointer->head->next_task;
+
+        //head of the queue is now free for elements to be removed from.
+        sem_post(queue_pointer->queue_head_semaphore);        
 
         //execute the task
-        //work(params);
-
-        //task_destroy(queue_pointer->head);
-        //set the next item in the queue to be the head
-        //queue_pointer->head = queue_pointer->head->next_task;
+        work(params);
       
         //signal 
         printf("Task has been executed!\n"); 
@@ -81,11 +89,18 @@ dispatch_queue_t *dispatch_queue_create(queue_type_t queue_type){
     //semaphore to track how many tasks there are to complete
 
     sem_t *semaphore = malloc(sizeof(*semaphore));
-    int err = sem_init(semaphore, 0, 0);
-    if (err !=0 ) {
+    int err1 = sem_init(semaphore, 0, 0);
+    if (err1 !=0 ) {
         fprintf(stderr, "\nerror creating semaphore\n");
     }
     dispatch_queue -> queue_semaphore = semaphore;
+
+    sem_t *head_semaphore = malloc(sizeof(*head_semaphore));
+    int err2 = sem_init(head_semaphore, 0, 1);
+    if (err2 !=0 ) {
+        fprintf(stderr, "\nerror creating semaphore\n");
+    }
+    dispatch_queue -> queue_head_semaphore = head_semaphore;
 
     //sem_init(&(dispatch_queue->queue_semaphore), 0, 0);
     printf("\ninitialised semaphore\n");
@@ -159,26 +174,20 @@ void add_to_queue(dispatch_queue_t *dispatch_queue, task_t *task){
 int dispatch_async(dispatch_queue_t *dispatch_queue, task_t *task){
     printf("\ncalling sem post when adding new task: %s\n", task->name);
     //appends the given task to the queue
-    //add_to_queue(dispatch_queue, task);
-
-    if (!dispatch_queue->head){ //adding task to the head of the queue
-        dispatch_queue->head = task;
-
-    } else { //already elements in the queue, add task to the tail
-        task_t *current = dispatch_queue->head;
-
-        while(current->next_task){
-            current = current->next_task;
-        }
-        current->next_task = task;
-    }
+    add_to_queue(dispatch_queue, task);
 
     //increment semaphore count when a new task is added to the queue
     if (sem_post(dispatch_queue->queue_semaphore) == 0){
     } else {
         printf("sem_post unsuccessful\n");
     }
-
+    /*
+    Need some way of ensuring that the head of the queue can only be accessed at once.
+    Have a semaphore that stores if the head of the queue is currently being changed.
+    The semaphore is 1 if the head is free to change. when any thread is accessing it 
+    it will be set to zero so that getting the element at the head of the queue is 
+    blocking code so that head can only be acccessed by one thread at a time.
+    */
     return 0;
 }
     
@@ -187,7 +196,6 @@ int dispatch_sync(dispatch_queue_t *queue, task_t *task) {
 }
     
 void dispatch_for(dispatch_queue_t *queue, long param, void (*work)(long)) {
-
 }
     
 int dispatch_queue_wait(dispatch_queue_t *queue) {

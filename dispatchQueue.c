@@ -107,15 +107,13 @@ dispatch_queue_t *dispatch_queue_create(queue_type_t queue_type){
     threads_executing = 0;
 
     //allocate memory for the thread pool
-    dispatch_queue->thread_queue = (dispatch_queue_thread_t*)malloc(sizeof(dispatch_queue_thread_t) * num_threads);
+    dispatch_queue->threads = (dispatch_queue_thread_t*)malloc(sizeof(dispatch_queue_thread_t) * num_threads);
 
     //initialise all the threads to call the polling function and wait for semaphore signal
     for (int i = 0; i < num_threads; i++) 
     {
-        dispatch_queue_thread_t thread = dispatch_queue->thread_queue[i];
+        dispatch_queue_thread_t thread = dispatch_queue->threads[i];
         dispatch_queue_thread_t *thread_pointer = &thread;
-
-        thread_pointer->queue = dispatch_queue;
 
         //generates a new thread which calls the wrapper function!
         if(pthread_create(&thread_pointer->pthread, NULL, thread_wrapper_func, dispatch_queue)) {
@@ -124,13 +122,42 @@ dispatch_queue_t *dispatch_queue_create(queue_type_t queue_type){
             return NULL;
         }   
     }
-
     return dispatch_queue;
 }
-    
+
+//removes all memory allocated to the dispatch queue
 void dispatch_queue_destroy(dispatch_queue_t *dispatch_queue){
-    task_destroy(dispatch_queue->head);
-    free(dispatch_queue->thread_queue->queue);
+    //deallocates memory for all tasks on the queue
+    /*
+    task_t *curr_task = dispatch_queue->head;
+    printf("\nname of head is %s\n", curr_task->name);
+    while(curr_task->next_task){
+        task_t *next_task = curr_task->next_task;
+        task_destroy(curr_task);
+        curr_task = next_task;
+    }
+    */
+
+   // if there are elements in the queue, free their memory
+   if (dispatch_queue->head){     
+        task_t *curr_task = dispatch_queue->head;
+        while (curr_task->next_task) {
+            task_t* next_task = curr_task->next_task;
+            printf("deallocating memory for task: %s\n", curr_task->name);
+            task_destroy(curr_task);
+            curr_task = next_task;
+        }
+        printf("deallocating memory for task: %s\n", curr_task->name);
+        task_destroy(curr_task);
+   }
+
+
+    //free the memory of the threads 
+    free(dispatch_queue->threads);
+
+    //free the memory of the queue semaphores
+    free(dispatch_queue->queue_semaphore);
+    free(dispatch_queue->queue_head_semaphore);
     free(dispatch_queue);   
 }
 

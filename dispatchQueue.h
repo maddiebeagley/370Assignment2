@@ -25,25 +25,23 @@
         char name[64];              // to identify it when debugging
         void (*work)(void *);       // the function to perform
         void *params;               // parameters to pass to the function
-        task_dispatch_type_t type;  // asynchronous or synchronous
-        struct task *next_task;          // stores the task to be accessed next
-        sem_t *task_semaphore;
+        struct task *next_task;     // stores the task to be accessed next
+        sem_t *task_semaphore;      // tracks whether a task has been completed
     } task_t;
     
-    typedef struct dispatch_queue_t dispatch_queue_t; // the dispatch queue type
+    typedef struct dispatch_queue_t dispatch_queue_t;               // the dispatch queue type
     typedef struct dispatch_queue_thread_t dispatch_queue_thread_t; // the dispatch queue thread type
 
     struct dispatch_queue_thread_t {
-        dispatch_queue_t *queue;// the queue this thread is associated with
         pthread_t pthread;       // the thread which runs the task
     };
 
     struct dispatch_queue_t {
         queue_type_t queue_type;            // the type of queue - serial or concurrent
         task_t *head;                       // pointer to the first task to be executed
-        dispatch_queue_thread_t *thread_queue;   //pointer to list of threads for queue to use
-        sem_t *queue_semaphore;              //hard to explain what something does when you don't know
-        sem_t *queue_head_semaphore;
+        dispatch_queue_thread_t *threads;   // pointer to list of threads for queue to use
+        sem_t *queue_semaphore;             // tracks how many tasks are ready to execute
+        sem_t *queue_head_semaphore;        // tracks whether head of queue is currently being accessed
     };
     
     task_t *task_create(void (*)(void *), void *, char*);

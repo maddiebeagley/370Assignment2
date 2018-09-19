@@ -1,7 +1,9 @@
 #include "dispatchQueue.h"
-#include "num_cores.c"
 #include <string.h>
 #include <stdlib.h>
+#include <sys/sysinfo.h>
+#include <stdio.h>
+
 
 void task_destroy(task_t *task);
 volatile int threads_executing;

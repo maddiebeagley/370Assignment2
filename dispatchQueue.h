@@ -29,19 +29,14 @@
         sem_t *task_semaphore;      // tracks whether a task has been completed
     } task_t;
     
-    typedef struct dispatch_queue_t dispatch_queue_t;               // the dispatch queue type
-    typedef struct dispatch_queue_thread_t dispatch_queue_thread_t; // the dispatch queue thread type
-
-    struct dispatch_queue_thread_t {
-        pthread_t pthread;       // the thread which runs the task
-    };
+    typedef struct dispatch_queue_t dispatch_queue_t;     // the dispatch queue type
 
     struct dispatch_queue_t {
         queue_type_t queue_type;            // the type of queue - serial or concurrent
         task_t *head;                       // pointer to the first task to be executed
-        dispatch_queue_thread_t *threads;   // pointer to list of threads for queue to use
+        pthread_t *threads;                 // pointer to list of threads for queue to use
         sem_t *queue_semaphore;             // tracks how many tasks are ready to execute
-        sem_t *queue_head_semaphore;        // tracks whether head of queue is currently being accessed
+        sem_t *queue_head_semaphore;        // used to ensure head of queue is not accessed concurrently
     };
     
     task_t *task_create(void (*)(void *), void *, char*);

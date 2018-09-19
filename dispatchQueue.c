@@ -7,6 +7,7 @@ void task_destroy(task_t *task);
 volatile int threads_executing;
 
 task_t* pop(dispatch_queue_t *queue);
+void push(dispatch_queue_t *dispatch_queue, task_t *task);
 
 /**
  * Takes in nothing. a thread polls through this method continually, either executing a task or waiting 
@@ -45,18 +46,6 @@ void *thread_wrapper_func(void *dispatch_queue) {
     }
     //function must return something
     return NULL;
-}
-
-task_t* pop(dispatch_queue_t *queue){
-    //set current task to execute as the head of the queue
-    task_t* current_task = queue->head;
-
-    //set the head of the queue to be the next task in the queue and remove previous head
-    task_t *next_task = current_task->next_task;
-    task_destroy(queue->head);
-    queue->head = queue->head->next_task;
-
-    return current_task;
 }
 
 task_t *task_create(void (*work)(void *), void *params, char *name){
@@ -152,23 +141,6 @@ void dispatch_queue_destroy(dispatch_queue_t *dispatch_queue){
     free(dispatch_queue);   
 }
 
-//adds given task to the tail of the dispatch queue
-void push(dispatch_queue_t *dispatch_queue, task_t *task){
-
-    if (!dispatch_queue->head){ //adding task to the head of the queue
-        dispatch_queue->head = task;
-
-    } else { //already elements in the queue, add task to the tail
-        task_t *current = dispatch_queue->head;
-        //continue cycling through queue until tail is reached
-        while(current->next_task){
-            current = current->next_task;
-        }
-        //assign current task to tail of queue
-        current->next_task = task;
-    }
-}
-
 int dispatch_async(dispatch_queue_t *dispatch_queue, task_t *task){
     //appends the given task to the queue
     push(dispatch_queue, task);
@@ -190,7 +162,7 @@ int dispatch_sync(dispatch_queue_t *queue, task_t *task) {
     task->task_semaphore = semaphore;
 
     //append given task to dispatch queue
-    add_to_queue(queue, task);
+    push(queue, task);
 
     //advertise new task to execute
     sem_post(queue->queue_semaphore);
@@ -222,4 +194,36 @@ int dispatch_queue_wait(dispatch_queue_t *queue) {
             return 0;
         }
     }
+}
+
+//******************* HELPER METHODS FOR QUEUE **********************
+
+
+//adds given task to the tail of the dispatch queue
+void push(dispatch_queue_t *dispatch_queue, task_t *task){
+
+    if (!dispatch_queue->head){ //adding task to the head of the queue
+        dispatch_queue->head = task;
+
+    } else { //already elements in the queue, add task to the tail
+        task_t *current = dispatch_queue->head;
+        //continue cycling through queue until tail is reached
+        while(current->next_task){
+            current = current->next_task;
+        }
+        //assign current task to tail of queue
+        current->next_task = task;
+    }
+}
+
+task_t* pop(dispatch_queue_t *queue){
+    //set current task to execute as the head of the queue
+    task_t* current_task = queue->head;
+
+    //set the head of the queue to be the next task in the queue and remove previous head
+    task_t *next_task = current_task->next_task;
+    task_destroy(queue->head);
+    queue->head = queue->head->next_task;
+
+    return current_task;
 }

@@ -97,7 +97,7 @@ dispatch_queue_t *dispatch_queue_create(queue_type_t queue_type){
 
     //number of threads in pool is same as number of cores if concurrent queue
     if (queue_type == CONCURRENT){
-        num_threads = get_num_cores();
+        num_threads = get_nprocs();
     }
 
     //number of threads executing tasks is initially 0

@@ -7,4 +7,7 @@ int get_num_cores(){
 	return num_cores;
 }
 
-
+int main() {
+	get_num_cores();
+	return 0;
+}

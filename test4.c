@@ -4,7 +4,6 @@
  */
 
 #include "dispatchQueue.h"
-#include "dispatchQueue.c"
 #include <stdio.h>
 #include <stdlib.h>
 

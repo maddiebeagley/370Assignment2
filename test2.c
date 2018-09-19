@@ -7,7 +7,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include "dispatchQueue.c"
 
 void test2() {
     sleep(1);

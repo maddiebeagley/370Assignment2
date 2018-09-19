@@ -18,10 +18,13 @@ void push(dispatch_queue_t *dispatch_queue, task_t *task);
 void *thread_wrapper_func(void *dispatch_queue) { 
     dispatch_queue_t *queue_pointer = dispatch_queue;
 
+
     while (1) {      
         //waits until there is a task for the thread to execute
+	printf("waiting on the semaphore\n");
         sem_wait(queue_pointer->queue_semaphore);
         threads_executing++;
+	printf("sem_wait has been executed\n");
 
         //waits until the head of the queue is free to be retrieved
         sem_wait(queue_pointer->queue_head_semaphore);
@@ -31,6 +34,7 @@ void *thread_wrapper_func(void *dispatch_queue) {
 
         //head of the queue is now free for elements to be retrieved
         sem_post(queue_pointer->queue_head_semaphore); 
+	printf("got task %s off queue \n", current_task->name);
 
         void *params = current_task->params;
         void (*work)(void *) = current_task->work;       
@@ -42,6 +46,7 @@ void *thread_wrapper_func(void *dispatch_queue) {
         if (current_task->task_semaphore) {
             sem_post(current_task->task_semaphore);
         }
+	printf("task with name: %s has been executed\n", current_task->name);
 
         //thread is no longer executing after completion of task function
         threads_executing--;
@@ -99,6 +104,8 @@ dispatch_queue_t *dispatch_queue_create(queue_type_t queue_type){
     if (queue_type == CONCURRENT){
         num_threads = get_nprocs();
     }
+	
+	printf("there are %d threads allocated\n", num_threads);
 
     //number of threads executing tasks is initially 0
     threads_executing = 0;
@@ -108,6 +115,7 @@ dispatch_queue_t *dispatch_queue_create(queue_type_t queue_type){
 
     //initialise all the threads to call the polling function and wait for semaphore signal
     for (int i = 0; i < num_threads; i++) {
+printf("making a thread\n");
         pthread_t thread = dispatch_queue->threads[i];
         pthread_t *thread_pointer = &thread;
 

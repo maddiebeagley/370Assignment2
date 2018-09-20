@@ -18,35 +18,52 @@ void push(dispatch_queue_t *dispatch_queue, task_t *task);
 void *thread_wrapper_func(void *dispatch_queue) { 
     dispatch_queue_t *queue_pointer = dispatch_queue;
 
-
+    //printf("address of queue from thread is: %p\n", dispatch_queue);
     while (1) {      
         //waits until there is a task for the thread to execute
-	printf("waiting on the semaphore\n");
+	    //printf("waiting on the semaphore\n");
         sem_wait(queue_pointer->queue_semaphore);
         threads_executing++;
-	printf("sem_wait has been executed\n");
+	    //printf("sem_wait has been executed\n");
 
         //waits until the head of the queue is free to be retrieved
-        sem_wait(queue_pointer->queue_head_semaphore);
+        sem_wait(queue_pointer->task_access_semaphore);
             
         //pop head of queue off top of queue of tasks to execute
+            //printf("popping an element off the queue\n");
+        // //set current task to execute as the head of the queue
+        // task_t* current_task = malloc(sizeof(task_t));
+        // current_task = queue_pointer->head;
+        // //printf("name of head is: %s\n", current_task->name);
+
+        // //set the head of the queue to be the next task in the queue and remove previous head
+        // task_t *next_task = current_task->next_task;
+        // //task_destroy(queue_pointer->head);
+        // queue_pointer->head = queue_pointer->head->next_task;
+        // //printf("new head is %s\n", queue_pointer->head->name);
+
+
+
         task_t* current_task = pop(queue_pointer);
 
         //head of the queue is now free for elements to be retrieved
-        sem_post(queue_pointer->queue_head_semaphore); 
-	printf("got task %s off queue \n", current_task->name);
+        sem_post(queue_pointer->task_access_semaphore); 
+        
+	    //printf("got task %s off queue \n", current_task->name);
 
         void *params = current_task->params;
         void (*work)(void *) = current_task->work;       
 
         //execute the task
         work(params);
+        printf("task with name: %s has been executed\n", current_task->name);
 
         //advertise that the current task has stopped executing
         if (current_task->task_semaphore) {
             sem_post(current_task->task_semaphore);
         }
-	printf("task with name: %s has been executed\n", current_task->name);
+
+        task_destroy(current_task);
 
         //thread is no longer executing after completion of task function
         threads_executing--;
@@ -65,6 +82,9 @@ task_t *task_create(void (*work)(void *), void *params, char *name){
     //function and input parameters for task to operate on
     new_task->work = work;
     new_task->params = params;
+    new_task->next_task = NULL;
+
+    //printf("CREATED TASK WITH NAME", new_task->
 
     return new_task;
 }
@@ -76,6 +96,7 @@ void task_destroy(task_t *task){
 
 dispatch_queue_t *dispatch_queue_create(queue_type_t queue_type){
     dispatch_queue_t *dispatch_queue = malloc(sizeof(dispatch_queue_t));
+    //printf("address of queue from creation %p", dispatch_queue);
 
     //haven't yet initialised task at the head of the queue
     dispatch_queue->head = NULL;
@@ -95,7 +116,7 @@ dispatch_queue_t *dispatch_queue_create(queue_type_t queue_type){
     if (sem_init(head_semaphore, 0, 1) !=0 ) {
         fprintf(stderr, "\nerror creating semaphore\n");
     }
-    dispatch_queue->queue_head_semaphore = head_semaphore;
+    dispatch_queue->task_access_semaphore = head_semaphore;
 
     //number of threads is 1 if queue is serial
     int num_threads = 1;
@@ -105,7 +126,7 @@ dispatch_queue_t *dispatch_queue_create(queue_type_t queue_type){
         num_threads = get_nprocs();
     }
 	
-	printf("there are %d threads allocated\n", num_threads);
+	//printf("there are %d threads allocated\n", num_threads);
 
     //number of threads executing tasks is initially 0
     threads_executing = 0;
@@ -115,7 +136,7 @@ dispatch_queue_t *dispatch_queue_create(queue_type_t queue_type){
 
     //initialise all the threads to call the polling function and wait for semaphore signal
     for (int i = 0; i < num_threads; i++) {
-printf("making a thread\n");
+    //printf("making a thread\n");
         pthread_t thread = dispatch_queue->threads[i];
         pthread_t *thread_pointer = &thread;
 
@@ -147,7 +168,7 @@ void dispatch_queue_destroy(dispatch_queue_t *dispatch_queue){
 
     //free the memory of the queue semaphores
     free(dispatch_queue->queue_semaphore);
-    free(dispatch_queue->queue_head_semaphore);
+    free(dispatch_queue->task_access_semaphore);
     free(dispatch_queue);   
 }
 
@@ -172,7 +193,9 @@ int dispatch_sync(dispatch_queue_t *queue, task_t *task) {
     task->task_semaphore = semaphore;
 
     //append given task to dispatch queue
+    sem_wait(queue->task_access_semaphore);
     push(queue, task);
+    sem_post(queue->task_access_semaphore);
 
     //advertise new task to execute
     sem_post(queue->queue_semaphore);
@@ -208,18 +231,19 @@ int dispatch_queue_wait(dispatch_queue_t *queue) {
 
 //******************* HELPER METHODS FOR QUEUE **********************
 
-
 //adds given task to the tail of the dispatch queue
 void push(dispatch_queue_t *dispatch_queue, task_t *task){
-
+    //printf("adding a new task to the queue\n");
     if (!dispatch_queue->head){ //adding task to the head of the queue
         dispatch_queue->head = task;
 
     } else { //already elements in the queue, add task to the tail
         task_t *current = dispatch_queue->head;
+        //printf("head is: %s\n", current->name);
         //continue cycling through queue until tail is reached
         while(current->next_task){
             current = current->next_task;
+            //printf("next task is %s\n", current->name);
         }
         //assign current task to tail of queue
         current->next_task = task;
@@ -227,13 +251,16 @@ void push(dispatch_queue_t *dispatch_queue, task_t *task){
 }
 
 task_t* pop(dispatch_queue_t *queue){
+    //printf("popping an element off the queue\n");
     //set current task to execute as the head of the queue
     task_t* current_task = queue->head;
+    //printf("name of head is: %s\n", current_task->name);
 
     //set the head of the queue to be the next task in the queue and remove previous head
     task_t *next_task = current_task->next_task;
-    task_destroy(queue->head);
+    //task_destroy(queue->head);
     queue->head = queue->head->next_task;
+    //printf("new head is %s\n", queue->head->name);
 
     return current_task;
 }

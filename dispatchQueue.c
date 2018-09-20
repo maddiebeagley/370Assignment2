@@ -52,7 +52,7 @@ void *thread_wrapper_func(void *dispatch_queue) {
         queue_pointer->threads_executing--;
 	pthread_mutex_unlock(queue_pointer->lock);
     }
-    //function must return something
+
     return NULL;
 }
 
@@ -116,7 +116,7 @@ dispatch_queue_t *dispatch_queue_create(queue_type_t queue_type){
     //number of threads executing tasks is initially 0
 
     //allocate memory for the thread pool
-    dispatch_queue->threads = (pthread_t*)malloc(sizeof(pthread_t) * num_threads);
+    dispatch_queue->threads = malloc(sizeof(pthread_t) * num_threads);
 
     //initialise all the threads to call the polling function and wait for semaphore signal
     for (int i = 0; i < num_threads; i++) {

@@ -24,7 +24,6 @@ void *thread_wrapper_func(void *dispatch_queue) {
 
 	pthread_mutex_lock(queue_pointer->lock);
         queue_pointer->threads_executing++;
-	printf("threads executing: %d\n", queue_pointer->threads_executing);
 	pthread_mutex_unlock(queue_pointer->lock);
 
         //waits until the head of the queue is free to be retrieved
@@ -41,7 +40,6 @@ void *thread_wrapper_func(void *dispatch_queue) {
         //execute the task
         work(params);
 
-        printf("task with name: %s has been executed\n", current_task->name);
 
         //advertise that the current task has stopped executing
         if (current_task->task_semaphore) {
@@ -52,7 +50,6 @@ void *thread_wrapper_func(void *dispatch_queue) {
         //thread is no longer executing after completion of task function
 	pthread_mutex_lock(queue_pointer->lock);
         queue_pointer->threads_executing--;
-	printf("threads executing after task: %d\n", queue_pointer->threads_executing);
 	pthread_mutex_unlock(queue_pointer->lock);
     }
     //function must return something

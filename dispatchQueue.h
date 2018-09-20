@@ -37,7 +37,7 @@
         pthread_t *threads;                 // pointer to list of threads for queue to use
         sem_t *queue_semaphore;             // tracks how many tasks are ready to execute
         sem_t *task_access_semaphore;        // used to ensure head of queue is not accessed concurrently
-	pthread_mutex_t *lock;
+	    pthread_mutex_t *lock;
 volatile int threads_executing;
     };
     

@@ -22,35 +22,37 @@ void *thread_wrapper_func(void *dispatch_queue) {
         //waits until there is a task for the thread to execute
         sem_wait(queue_pointer->queue_semaphore);
 
-	pthread_mutex_lock(queue_pointer->lock);
+        //increment the variable storing how many threads are currently executing
+	    pthread_mutex_lock(queue_pointer->lock);
         queue_pointer->threads_executing++;
-	pthread_mutex_unlock(queue_pointer->lock);
+	    pthread_mutex_unlock(queue_pointer->lock);
 
         //waits until the head of the queue is free to be retrieved
         sem_wait(queue_pointer->task_access_semaphore);
 
+        //retrieve the task at the head of the queue
         task_t* current_task = pop(queue_pointer);
 
         //head of the queue is now free for elements to be retrieved
         sem_post(queue_pointer->task_access_semaphore); 
 
+        //execute the task
         void *params = current_task->params;
         void (*work)(void *) = current_task->work;       
-
-        //execute the task
         work(params);
-
 
         //advertise that the current task has stopped executing
         if (current_task->task_semaphore) {
             sem_post(current_task->task_semaphore);
         }
 
+        //free memory from reference to executed task
         task_destroy(current_task);
-        //thread is no longer executing after completion of task function
-	pthread_mutex_lock(queue_pointer->lock);
+
+        //thread has now finished executing this task
+	    pthread_mutex_lock(queue_pointer->lock);
         queue_pointer->threads_executing--;
-	pthread_mutex_unlock(queue_pointer->lock);
+	    pthread_mutex_unlock(queue_pointer->lock);
     }
 
     return NULL;
@@ -66,13 +68,15 @@ task_t *task_create(void (*work)(void *), void *params, char *name){
     //function and input parameters for task to operate on
     new_task->work = work;
     new_task->params = params;
+
+    //no initial reference to the next node, assigned when adding to queue
     new_task->next_task = NULL;
 
     return new_task;
 }
 
-// frees memory associated to the input task
 void task_destroy(task_t *task){
+    //free memory associated to the input task
     free(task);
 }
 
@@ -95,14 +99,15 @@ dispatch_queue_t *dispatch_queue_create(queue_type_t queue_type){
     }
     dispatch_queue->queue_semaphore = semaphore;
 
-    //semaphor to track if the head of the queue is currently being retrieved
+    //semaphore to track if the queue is currently being retrieved
     //only one thread should retrieve the head of the queue at any given time
-    sem_t *head_semaphore = malloc(sizeof(*head_semaphore));
-    if (sem_init(head_semaphore, 0, 1) !=0 ) {
+    sem_t *task_access_semaphore = malloc(sizeof(*task_access_semaphore));
+    if (sem_init(task_access_semaphore, 0, 1) !=0 ) {
         fprintf(stderr, "\nerror creating semaphore\n");
     }
-    dispatch_queue->task_access_semaphore = head_semaphore;
+    dispatch_queue->task_access_semaphore = task_access_semaphore;
 
+    //initially there are no threads executing tasks
 	dispatch_queue->threads_executing = 0;
 
     //number of threads is 1 if queue is serial
@@ -113,18 +118,13 @@ dispatch_queue_t *dispatch_queue_create(queue_type_t queue_type){
         num_threads = get_nprocs();
     }
 
-    //number of threads executing tasks is initially 0
-
     //allocate memory for the thread pool
     dispatch_queue->threads = malloc(sizeof(pthread_t) * num_threads);
 
     //initialise all the threads to call the polling function and wait for semaphore signal
     for (int i = 0; i < num_threads; i++) {
-        pthread_t thread = dispatch_queue->threads[i];
-        pthread_t *thread_pointer = &thread;
-
         //generates a new thread which calls the polling wrapper function
-        if(pthread_create(thread_pointer, NULL, thread_wrapper_func, dispatch_queue)) {
+        if(pthread_create(&dispatch_queue->threads[i], NULL, thread_wrapper_func, dispatch_queue)) {
             fprintf(stderr, "\nError creating thread\n");
             return NULL;
         }   

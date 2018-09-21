@@ -21,25 +21,18 @@ void *thread_wrapper_func(void *dispatch_queue) {
     while (1) {      
         //waits until there is a task for the thread to execute
         sem_wait(queue_pointer->queue_semaphore);
-
-        //increment the variable storing how many threads are currently executing
+    
 	    pthread_mutex_lock(queue_pointer->lock);
+
+        //increment the number of threads currently executing
         queue_pointer->threads_executing++;
-	    pthread_mutex_unlock(queue_pointer->lock);
-
-        //waits until the head of the queue is free to be retrieved
-        sem_wait(queue_pointer->task_access_semaphore);
-
-        //retrieve the task at the head of the queue
+        //retrieve the element at the front of the queue
         task_t* current_task = pop(queue_pointer);
 
-        //head of the queue is now free for elements to be retrieved
-        sem_post(queue_pointer->task_access_semaphore); 
+	    pthread_mutex_unlock(queue_pointer->lock);
 
-        //execute the task
-        void *params = current_task->params;
-        void (*work)(void *) = current_task->work;       
-        work(params);
+        //execute the task from the head of the queue
+        current_task->work(current_task->params);    
 
         //advertise that the current task has stopped executing
         if (current_task->task_semaphore) {
@@ -99,14 +92,6 @@ dispatch_queue_t *dispatch_queue_create(queue_type_t queue_type){
     }
     dispatch_queue->queue_semaphore = semaphore;
 
-    //semaphore to track if the queue is currently being retrieved
-    //only one thread should retrieve the head of the queue at any given time
-    sem_t *task_access_semaphore = malloc(sizeof(*task_access_semaphore));
-    if (sem_init(task_access_semaphore, 0, 1) !=0 ) {
-        fprintf(stderr, "\nerror creating semaphore\n");
-    }
-    dispatch_queue->task_access_semaphore = task_access_semaphore;
-
     //initially there are no threads executing tasks
 	dispatch_queue->threads_executing = 0;
 
@@ -151,13 +136,14 @@ void dispatch_queue_destroy(dispatch_queue_t *dispatch_queue){
 
     //free the memory of the queue semaphores
     free(dispatch_queue->queue_semaphore);
-    free(dispatch_queue->task_access_semaphore);
     free(dispatch_queue);   
 }
 
 int dispatch_async(dispatch_queue_t *dispatch_queue, task_t *task){
     //appends the given task to the queue
+	pthread_mutex_lock(dispatch_queue->lock);
     push(dispatch_queue, task);
+	pthread_mutex_unlock(dispatch_queue->lock);
 
     //increment semaphore count when a new task is added to the queue
     if (sem_post(dispatch_queue->queue_semaphore) == 0){
@@ -176,12 +162,15 @@ int dispatch_sync(dispatch_queue_t *queue, task_t *task) {
     task->task_semaphore = semaphore;
 
     //append given task to dispatch queue
-    sem_wait(queue->task_access_semaphore);
+	pthread_mutex_lock(queue->lock);
     push(queue, task);
-    sem_post(queue->task_access_semaphore);
+	pthread_mutex_unlock(queue->lock);
 
-    //advertise new task to execute
-    sem_post(queue->queue_semaphore);
+    //advertise that there is a new task to execute to threads
+    if (sem_post(queue->queue_semaphore) == 0){
+    } else {
+        printf("sem_post unsuccessful\n");
+    }
 
     //wait until task semaphor signals completion of task
     sem_wait(task->task_semaphore);

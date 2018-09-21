@@ -36,8 +36,8 @@
         task_t *head;                       // pointer to the first task to be executed
         pthread_t *threads;                 // pointer to list of threads for queue to use
         sem_t *queue_semaphore;             // tracks how many tasks are ready to execute
-	    pthread_mutex_t *lock;
-volatile int threads_executing;
+	    pthread_mutex_t *lock;              // used to a lock a queue to protect from concurrent access
+        volatile int threads_executing;     // stores the number of threads currently executing tasks
     };
     
     task_t *task_create(void (*)(void *), void *, char*);

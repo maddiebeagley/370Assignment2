@@ -133,7 +133,7 @@ void dispatch_queue_destroy(dispatch_queue_t *dispatch_queue){
     //free the memory of the list of threads
     free(dispatch_queue->threads);
 
-    //free the memory of the queue semaphores
+    //free the memory of the queue semaphore and lock
     free(dispatch_queue->queue_semaphore);
     free(dispatch_queue->lock);
     free(dispatch_queue);   

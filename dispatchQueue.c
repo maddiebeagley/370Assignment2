@@ -81,9 +81,8 @@ dispatch_queue_t *dispatch_queue_create(queue_type_t queue_type){
 
     dispatch_queue->queue_type = queue_type;
 
-	pthread_mutex_t *lock = malloc(sizeof(pthread_mutex_t));
-	pthread_mutex_init(lock, NULL);
-	dispatch_queue->lock = lock;
+	dispatch_queue->lock = malloc(sizeof(pthread_mutex_t));
+	pthread_mutex_init(dispatch_queue->lock, NULL);
 
     //semaphore to track how many tasks there are to complete
     sem_t *semaphore = malloc(sizeof(*semaphore));
@@ -136,6 +135,7 @@ void dispatch_queue_destroy(dispatch_queue_t *dispatch_queue){
 
     //free the memory of the queue semaphores
     free(dispatch_queue->queue_semaphore);
+    free(dispatch_queue->lock);
     free(dispatch_queue);   
 }
 
